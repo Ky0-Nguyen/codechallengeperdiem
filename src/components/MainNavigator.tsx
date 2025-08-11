@@ -10,6 +10,7 @@ import { observer } from 'mobx-react-lite';
 import { useStore } from '../contexts/StoreProvider';
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
+import FirebaseDemoScreen from '../screens/FirebaseDemoScreen';
 import LoadingScreen from './LoadingScreen';
 import StoreService from '../services/StoreService';
 

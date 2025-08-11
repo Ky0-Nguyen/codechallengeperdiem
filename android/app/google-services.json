@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "62408832184",
+    "project_id": "tuandemotindercloneswiftui",
+    "storage_bucket": "tuandemotindercloneswiftui.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:62408832184:android:dfedb72bd82d275fc5f04d",
+        "android_client_info": {
+          "package_name": "com.codechallenge"
+        }
+      },
+              "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjQ5zcPPHFBmLnIkII5g6Y_Rt1ZW1T_ug"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

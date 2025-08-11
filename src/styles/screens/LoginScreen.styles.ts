@@ -108,4 +108,14 @@ export const loginScreenStyles = StyleSheet.create({
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     textDecorationLine: 'underline',
   },
+  switchModeButton: {
+    paddingVertical: SPACING.SM,
+    paddingHorizontal: SPACING.MD,
+    marginTop: SPACING.SM,
+  },
+  switchModeButtonText: {
+    color: COLORS.PRIMARY,
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+    textDecorationLine: 'underline',
+  },
 }); 

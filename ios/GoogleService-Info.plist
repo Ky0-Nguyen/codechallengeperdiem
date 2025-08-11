@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyCCM6jW9i5pY4U1NqF9IIofSlXBk568278</string>
+	<key>GCM_SENDER_ID</key>
+	<string>62408832184</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.codechallenge</string>
+	<key>PROJECT_ID</key>
+	<string>tuandemotindercloneswiftui</string>
+	<key>STORAGE_BUCKET</key>
+	<string>tuandemotindercloneswiftui.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:62408832184:ios:dc26810de99edba6c5f04d</string>
+</dict>
+</plist>

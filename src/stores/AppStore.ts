@@ -5,7 +5,9 @@ import MMKVStorage, {
   NotificationSettings,
   STORAGE_KEYS 
 } from '../services/MMKVStorage';
+import FirebaseService from '../services/FirebaseService';
 import { SelectedDateTime, TimeSlot, StoreInfo } from '../types';
+import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 class AppStore {
   // App state
@@ -15,6 +17,7 @@ class AppStore {
   // User data
   userProfile: UserProfile | null = null;
   isAuthenticated = false;
+  firebaseUser: FirebaseAuthTypes.User | null = null;
   
   // App settings
   appSettings: AppSettings = {
@@ -53,6 +56,7 @@ class AppStore {
   constructor() {
     makeAutoObservable(this);
     this.initializeStore();
+    this.initializeFirebaseAuth();
   }
 
   // Initialize store from MMKV storage
@@ -100,11 +104,97 @@ class AppStore {
     }
   }
 
+  // Initialize Firebase Authentication
+  private initializeFirebaseAuth() {
+    const unsubscribe = FirebaseService.onAuthStateChanged((user) => {
+      runInAction(() => {
+        this.firebaseUser = user;
+        if (user) {
+          // User is signed in
+          this.isAuthenticated = true;
+          this.userProfile = {
+            id: user.uid,
+            email: user.email || '',
+            name: user.displayName || user.email?.split('@')[0] || 'User',
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            photoURL: user.photoURL || null,
+            provider: user.providerData[0]?.providerId || 'email',
+          };
+          // Save to persistent storage
+          MMKVStorage.setUserProfile(this.userProfile);
+        } else {
+          // User is signed out
+          this.isAuthenticated = false;
+          this.userProfile = null;
+          MMKVStorage.delete(STORAGE_KEYS.USER_PROFILE);
+        }
+      });
+    });
+
+    // Return unsubscribe function for cleanup
+    return unsubscribe;
+  }
+
   // User actions
   setUserProfile(profile: UserProfile) {
     this.userProfile = profile;
     this.isAuthenticated = true;
     MMKVStorage.setUserProfile(profile);
+  }
+
+  // Firebase Authentication methods
+  async signInWithEmail(email: string, password: string): Promise<void> {
+    runInAction(() => {
+      this.isLoading = true;
+    });
+
+    try {
+      await FirebaseService.signInWithEmail(email, password);
+      // User profile will be set automatically by the auth state listener
+    } catch (error) {
+      console.error('Email sign in error:', error);
+      throw error;
+    } finally {
+      runInAction(() => {
+        this.isLoading = false;
+      });
+    }
+  }
+
+  async signUpWithEmail(email: string, password: string): Promise<void> {
+    runInAction(() => {
+      this.isLoading = true;
+    });
+
+    try {
+      await FirebaseService.signUpWithEmail(email, password);
+      // User profile will be set automatically by the auth state listener
+    } catch (error) {
+      console.error('Email sign up error:', error);
+      throw error;
+    } finally {
+      runInAction(() => {
+        this.isLoading = false;
+      });
+    }
+  }
+
+  async signInWithGoogle(): Promise<void> {
+    runInAction(() => {
+      this.isLoading = true;
+    });
+
+    try {
+      await FirebaseService.signInWithGoogle();
+      // User profile will be set automatically by the auth state listener
+    } catch (error) {
+      console.error('Google sign in error:', error);
+      throw error;
+    } finally {
+      runInAction(() => {
+        this.isLoading = false;
+      });
+    }
   }
 
   updateUserProfile(updates: Partial<UserProfile>) {
@@ -117,8 +207,11 @@ class AppStore {
   logout() {
     this.userProfile = null;
     this.isAuthenticated = false;
+    this.firebaseUser = null;
     MMKVStorage.clearAuthToken();
     MMKVStorage.delete(STORAGE_KEYS.USER_PROFILE);
+    // Sign out from Firebase
+    FirebaseService.signOut();
   }
 
   // App settings actions
