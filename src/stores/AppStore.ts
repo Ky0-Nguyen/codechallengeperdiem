@@ -6,8 +6,10 @@ import MMKVStorage, {
   STORAGE_KEYS 
 } from '../services/MMKVStorage';
 import FirebaseService from '../services/FirebaseService';
+import ApiService from '../services/ApiService';
 import { SelectedDateTime, TimeSlot, StoreInfo } from '../types';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import NotificationService from '../services/NotificationService';
 
 class AppStore {
   // App state
@@ -91,6 +93,14 @@ class AppStore {
         });
       }
 
+      // Load timezone preference
+      const savedTimezone = MMKVStorage.get(STORAGE_KEYS.TIMEZONE_PREFERENCE);
+      if (savedTimezone !== null) {
+        runInAction(() => {
+          this.isNYCTimezone = savedTimezone === 'nyc';
+        });
+      }
+
       runInAction(() => {
         this.isInitialized = true;
         this.isLoading = false;
@@ -112,16 +122,22 @@ class AppStore {
         if (user) {
           // User is signed in
           this.isAuthenticated = true;
-          this.userProfile = {
+          const userProfile: UserProfile = {
             id: user.uid,
             email: user.email || '',
             name: user.displayName || user.email?.split('@')[0] || 'User',
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            photoURL: user.photoURL || null,
+            photoURL: user.photoURL || undefined,
             provider: user.providerData[0]?.providerId || 'email',
+            preferences: {
+              notifications: true,
+              theme: 'auto',
+              language: 'en',
+            },
           };
+          this.userProfile = userProfile;
           // Save to persistent storage
-          MMKVStorage.setUserProfile(this.userProfile);
+          MMKVStorage.setUserProfile(userProfile);
         } else {
           // User is signed out
           this.isAuthenticated = false;
@@ -149,8 +165,33 @@ class AppStore {
     });
 
     try {
-      await FirebaseService.signInWithEmail(email, password);
-      // User profile will be set automatically by the auth state listener
+      // Try mock API authentication first
+      const authResponse = await ApiService.authenticate(email, password);
+      
+      if (authResponse.success && authResponse.user) {
+        // Create user profile from API response
+        const userProfile: UserProfile = {
+          id: authResponse.user.id,
+          email: authResponse.user.email,
+          name: authResponse.user.name,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          preferences: {
+            notifications: true,
+            theme: 'auto',
+            language: 'en',
+          },
+        };
+        
+        runInAction(() => {
+          this.userProfile = userProfile;
+          this.isAuthenticated = true;
+        });
+        
+        // Save to persistent storage
+        MMKVStorage.setUserProfile(userProfile);
+      } else {
+        throw new Error(authResponse.message || 'Authentication failed');
+      }
     } catch (error) {
       console.error('Email sign in error:', error);
       throw error;
@@ -167,8 +208,34 @@ class AppStore {
     });
 
     try {
-      await FirebaseService.signUpWithEmail(email, password);
-      // User profile will be set automatically by the auth state listener
+      // For sign up, we'll use the same authenticate endpoint
+      // In a real app, you'd have a separate signup endpoint
+      const authResponse = await ApiService.authenticate(email, password);
+      
+      if (authResponse.success && authResponse.user) {
+        // Create user profile from API response
+        const userProfile: UserProfile = {
+          id: authResponse.user.id,
+          email: authResponse.user.email,
+          name: authResponse.user.name,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          preferences: {
+            notifications: true,
+            theme: 'auto',
+            language: 'en',
+          },
+        };
+        
+        runInAction(() => {
+          this.userProfile = userProfile;
+          this.isAuthenticated = true;
+        });
+        
+        // Save to persistent storage
+        MMKVStorage.setUserProfile(userProfile);
+      } else {
+        throw new Error(authResponse.message || 'Sign up failed');
+      }
     } catch (error) {
       console.error('Email sign up error:', error);
       throw error;
@@ -272,6 +339,7 @@ class AppStore {
 
   setNYCTimezone(isNYC: boolean) {
     this.isNYCTimezone = isNYC;
+    MMKVStorage.set(STORAGE_KEYS.TIMEZONE_PREFERENCE, isNYC ? 'nyc' : 'auto');
   }
 
   // Store information actions
@@ -350,6 +418,90 @@ class AppStore {
       return `Good Evening, ${city}!`;
     } else {
       return `Night Owl in ${city}!`;
+    }
+  }
+
+  // Store status methods
+  getStoreStatus(): { isOpen: boolean; message: string; nextOpenTime?: string } {
+    if (!this.storeInfo) {
+      return { isOpen: true, message: 'Store is Open' };
+    }
+
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const currentTime = now.toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    // Check store overrides first
+    const dateString = now.toISOString().split('T')[0];
+    const override = this.storeInfo.storeOverrides.find(o => o.date === dateString);
+    
+    if (override) {
+      if (!override.isOpen) {
+        return { 
+          isOpen: false, 
+          message: override.reason || 'Store is Closed' 
+        };
+      }
+      if (override.openTime && override.closeTime) {
+        const isOpen = currentTime >= override.openTime && currentTime <= override.closeTime;
+        return { 
+          isOpen, 
+          message: isOpen ? 'Store is Open' : 'Store is Closed',
+          nextOpenTime: !isOpen ? override.openTime : undefined
+        };
+      }
+    }
+
+    // Check regular store hours
+    const storeHours = this.storeInfo.storeHours.find(h => h.dayOfWeek === dayOfWeek);
+    if (!storeHours || !storeHours.isOpen) {
+      return { isOpen: false, message: 'Store is Closed' };
+    }
+    
+    const isOpen = currentTime >= storeHours.openTime && currentTime <= storeHours.closeTime;
+    return { 
+      isOpen, 
+      message: isOpen ? 'Store is Open' : 'Store is Closed',
+      nextOpenTime: !isOpen ? storeHours.openTime : undefined
+    };
+  }
+
+  // Schedule notification for next store opening
+  async scheduleStoreOpeningNotification() {
+    try {
+      const status = this.getStoreStatus();
+      if (status.isOpen) return; // Store is already open
+
+      if (status.nextOpenTime) {
+        // Calculate when to send notification (1 hour before opening)
+        const [hours, minutes] = status.nextOpenTime.split(':').map(Number);
+        const nextOpenDate = new Date();
+        nextOpenDate.setHours(hours, minutes, 0, 0);
+        
+        // If the time has passed today, schedule for tomorrow
+        if (nextOpenDate <= new Date()) {
+          nextOpenDate.setDate(nextOpenDate.getDate() + 1);
+        }
+
+        // Schedule notification 1 hour before opening
+        const notificationTime = new Date(nextOpenDate.getTime() - 60 * 60 * 1000);
+        
+        if (notificationTime > new Date()) {
+          await NotificationService.scheduleNotification(
+            'Store Opening Soon!',
+            `The store will open in 1 hour at ${status.nextOpenTime}`,
+            { date: notificationTime },
+            { type: 'store_opening' }
+          );
+          console.log('Store opening notification scheduled for:', notificationTime);
+        }
+      }
+    } catch (error) {
+      console.error('Error scheduling store opening notification:', error);
     }
   }
 

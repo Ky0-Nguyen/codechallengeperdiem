@@ -16,12 +16,20 @@ import {
 import { observer } from 'mobx-react-lite';
 import { useStore } from '../contexts/StoreProvider';
 import DateTimePicker from '../components/DateTimePicker';
+import ErrorRetryButton from '../components/ErrorRetryButton';
+import LoadingOverlay from '../components/LoadingOverlay';
+import StoreStatusCard from '../components/StoreStatusCard';
+import TimeSlotSkeleton from '../components/TimeSlotSkeleton';
+import SuccessMessage from '../components/SuccessMessage';
 import { homeScreenStyles } from '../styles';
 import FadeInView from '../components/animations/FadeInView';
 import SlideInView from '../components/animations/SlideInView';
 import ScaleInView from '../components/animations/ScaleInView';
 import PulseView from '../components/animations/PulseView';
 import AnimatedButton from '../components/animations/AnimatedButton';
+import ConfettiAnimation from '../components/animations/ConfettiAnimation';
+import { useApi } from '../core/hooks';
+import ApiService from '../services/ApiService';
 
 interface TimeSlot {
   id: string;
@@ -44,9 +52,13 @@ const HomeScreen: React.FC = observer(() => {
   const [selectedDate, setSelectedDate] = useState<DateItem | null>(null);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
-  const [isNYCTimezone, setIsNYCTimezone] = useState(false);
   const [dates, setDates] = useState<DateItem[]>([]);
   const [isDateTimePickerVisible, setIsDateTimePickerVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Generate dates for the next 30 days
   useEffect(() => {
@@ -81,6 +93,20 @@ const HomeScreen: React.FC = observer(() => {
     generateDates();
   }, []);
 
+  // Schedule store opening notification when component mounts
+  useEffect(() => {
+    const scheduleNotification = async () => {
+      await appStore.scheduleStoreOpeningNotification();
+    };
+    scheduleNotification();
+  }, [appStore]);
+
+  // Sync timezone preference with app store
+  useEffect(() => {
+    // This ensures the UI reflects the persisted timezone preference
+    // The appStore.isNYCTimezone is already loaded from MMKV storage in initializeStore()
+  }, [appStore.isNYCTimezone]);
+
   // Generate time slots for selected date
   const generateTimeSlots = (date: Date) => {
     const slots: TimeSlot[] = [];
@@ -94,10 +120,13 @@ const HomeScreen: React.FC = observer(() => {
         const [hours, minutes] = time.split(':').map(Number);
         slotDate.setHours(hours, minutes, 0, 0);
         
+        // Check if store is open for this time slot
+        const isAvailable = appStore.isStoreOpen(date, { id: time, time, isAvailable: true, isSelected: false });
+        
         slots.push({
           id: `${date.toISOString()}-${time}`,
           time,
-          isAvailable: true, // TODO: Check store hours
+          isAvailable,
           isSelected: false,
         });
       }
@@ -142,11 +171,11 @@ const HomeScreen: React.FC = observer(() => {
       timeSlot: selectedTimeSlot,
     });
 
-    Alert.alert(
-      'Success',
-      `Appointment confirmed for ${selectedDate.formattedDate} at ${selectedTimeSlot.time}`,
-      [{ text: 'OK' }]
-    );
+    // Show success message and confetti
+    const message = `Appointment confirmed for ${selectedDate.formattedDate} at ${selectedTimeSlot.time}`;
+    setSuccessMessage(message);
+    setShowSuccessMessage(true);
+    setShowConfetti(true);
   };
 
   const handleOpenDateTimePicker = () => {
@@ -188,11 +217,15 @@ const HomeScreen: React.FC = observer(() => {
     );
   };
 
+  const handleTimezoneToggle = (value: boolean) => {
+    appStore.setNYCTimezone(value);
+  };
+
   const getGreetingMessage = () => {
     const now = new Date();
     const nycTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
     const hour = nycTime.getHours();
-    const city = isNYCTimezone ? 'NYC' : 'your city';
+    const city = appStore.isNYCTimezone ? 'NYC' : 'your city';
 
     if (hour >= 5 && hour < 10) {
       return `Good Morning, ${city}!`;
@@ -208,7 +241,7 @@ const HomeScreen: React.FC = observer(() => {
   };
 
   const getCurrentTime = () => {
-    const timezone = isNYCTimezone ? 'America/New_York' : Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timezone = appStore.isNYCTimezone ? 'America/New_York' : Intl.DateTimeFormat().resolvedOptions().timeZone;
     return new Date().toLocaleTimeString('en-US', {
       timeZone: timezone,
       hour12: false,
@@ -217,8 +250,66 @@ const HomeScreen: React.FC = observer(() => {
     });
   };
 
+  // Get store status from API
+  const storeStatus = appStore.getStoreStatus();
+
+  // API hooks for store data
+  const storeTimesApi = useApi();
+  const storeOverridesApi = useApi();
+
+  // Load store data with retry functionality
+  const loadStoreData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      await Promise.all([
+        storeTimesApi.execute(() => ApiService.getStoreTimes()),
+        storeOverridesApi.execute(() => ApiService.getStoreOverrides()),
+      ]);
+      
+      // Refresh store status after loading data
+      const storeInfo = await ApiService.getStoreTimes();
+      console.log('Store data loaded successfully');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load store data';
+      setError(errorMessage);
+      console.error('Error loading store data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load store data on component mount
+  useEffect(() => {
+    loadStoreData();
+  }, []);
+
+  // Handle retry
+  const handleRetry = () => {
+    loadStoreData();
+  };
+
   return (
     <View style={homeScreenStyles.container}>
+      {/* Loading Overlay */}
+      <LoadingOverlay 
+        visible={isLoading} 
+        message="Loading store data..."
+      />
+
+      {/* Error Retry Button */}
+      {error && !isLoading && (
+        <FadeInView delay={100}>
+          <ErrorRetryButton
+            error={error}
+            onRetry={handleRetry}
+            isLoading={isLoading}
+            style={homeScreenStyles.errorContainer}
+          />
+        </FadeInView>
+      )}
+
       {/* Header */}
       <SlideInView direction="top" delay={200}>
         <View style={homeScreenStyles.header}>
@@ -238,13 +329,13 @@ const HomeScreen: React.FC = observer(() => {
             <View style={homeScreenStyles.headerControls}>
               <View style={homeScreenStyles.timezoneToggle}>
                 <Text style={homeScreenStyles.timezoneLabel}>
-                  {isNYCTimezone ? 'NYC Time' : 'Local Time'}
+                  {appStore.isNYCTimezone ? 'NYC Time' : 'Local Time'}
                 </Text>
                 <Switch
-                  value={isNYCTimezone}
-                  onValueChange={setIsNYCTimezone}
+                  value={appStore.isNYCTimezone}
+                  onValueChange={handleTimezoneToggle}
                   trackColor={{ false: '#767577', true: '#81b0ff' }}
-                  thumbColor={isNYCTimezone ? '#007AFF' : '#f4f3f4'}
+                  thumbColor={appStore.isNYCTimezone ? '#007AFF' : '#f4f3f4'}
                 />
               </View>
               
@@ -262,10 +353,11 @@ const HomeScreen: React.FC = observer(() => {
       {/* Store Status */}
       <SlideInView direction="left" delay={1000}>
         <PulseView duration={3000} scale={1.02}>
-          <View style={homeScreenStyles.storeStatus}>
-            <View style={[homeScreenStyles.statusLight, { backgroundColor: '#4CAF50' }]} />
-            <Text style={homeScreenStyles.statusText}>Store is Open</Text>
-          </View>
+          <StoreStatusCard 
+            isOpen={storeStatus.isOpen} 
+            message={storeStatus.message}
+            nextOpenTime={storeStatus.nextOpenTime}
+          />
         </PulseView>
       </SlideInView>
 
@@ -346,29 +438,33 @@ const HomeScreen: React.FC = observer(() => {
               </Text>
             </FadeInView>
             <View style={homeScreenStyles.timeSlotsContainer}>
-              {timeSlots.map((timeSlot, index) => (
-                <FadeInView key={timeSlot.id} delay={2200 + index * 50}>
-                  <ScaleInView useSpring>
-                    <TouchableOpacity
-                      style={[
-                        homeScreenStyles.timeSlot,
-                        !timeSlot.isAvailable && homeScreenStyles.unavailableTimeSlot,
-                        timeSlot.isSelected && homeScreenStyles.selectedTimeSlot,
-                      ]}
-                      onPress={() => handleTimeSlotSelect(timeSlot)}
-                      disabled={!timeSlot.isAvailable}
-                    >
-                      <Text style={[
-                        homeScreenStyles.timeSlotText,
-                        !timeSlot.isAvailable && homeScreenStyles.unavailableTimeSlotText,
-                        timeSlot.isSelected && homeScreenStyles.selectedTimeSlotText,
-                      ]}>
-                        {timeSlot.time}
-                      </Text>
-                    </TouchableOpacity>
-                  </ScaleInView>
-                </FadeInView>
-              ))}
+              {isLoading ? (
+                <TimeSlotSkeleton />
+              ) : (
+                timeSlots.map((timeSlot, index) => (
+                  <FadeInView key={timeSlot.id} delay={2200 + index * 50}>
+                    <ScaleInView useSpring>
+                      <TouchableOpacity
+                        style={[
+                          homeScreenStyles.timeSlot,
+                          !timeSlot.isAvailable && homeScreenStyles.unavailableTimeSlot,
+                          timeSlot.isSelected && homeScreenStyles.selectedTimeSlot,
+                        ]}
+                        onPress={() => handleTimeSlotSelect(timeSlot)}
+                        disabled={!timeSlot.isAvailable}
+                      >
+                        <Text style={[
+                          homeScreenStyles.timeSlotText,
+                          !timeSlot.isAvailable && homeScreenStyles.unavailableTimeSlotText,
+                          timeSlot.isSelected && homeScreenStyles.selectedTimeSlotText,
+                        ]}>
+                          {timeSlot.time}
+                        </Text>
+                      </TouchableOpacity>
+                    </ScaleInView>
+                  </FadeInView>
+                ))
+              )}
             </View>
           </View>
         )}
@@ -393,7 +489,20 @@ const HomeScreen: React.FC = observer(() => {
         visible={isDateTimePickerVisible}
         onClose={handleCloseDateTimePicker}
         onConfirm={handleDateTimePickerConfirm}
-        isNYCTimezone={isNYCTimezone}
+        isNYCTimezone={appStore.isNYCTimezone}
+      />
+
+      {/* Confetti Animation */}
+      <ConfettiAnimation 
+        visible={showConfetti} 
+        onComplete={() => setShowConfetti(false)} 
+      />
+
+      {/* Success Message */}
+      <SuccessMessage
+        visible={showSuccessMessage}
+        message={successMessage}
+        onComplete={() => setShowSuccessMessage(false)}
       />
     </View>
   );

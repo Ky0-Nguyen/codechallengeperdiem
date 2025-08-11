@@ -3,12 +3,15 @@ import firestore from '@react-native-firebase/firestore';
 import storage from '@react-native-firebase/storage';
 import analytics from '@react-native-firebase/analytics';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { getFirebaseConfig } from '../config/firebase';
 
 class FirebaseService {
   constructor() {
     // Initialize Google Sign-In
     GoogleSignin.configure({
-      webClientId: '62408832184-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com', // Replace with your web client ID
+      webClientId: '62408832184-5555d3t8v2ude4un9vgms3vf8pnomlai.apps.googleusercontent.com',
+      iosClientId: '62408832184-i2oco868l0uvp7veel34284d8mq2suf1.apps.googleusercontent.com',
+      offlineAccess:true
     });
   }
 

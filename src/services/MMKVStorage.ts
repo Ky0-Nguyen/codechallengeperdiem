@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
   AUTH_TOKEN: 'auth_token',
   THEME: 'theme',
   LANGUAGE: 'language',
+  TIMEZONE_PREFERENCE: 'timezone_preference',
 } as const;
 
 // Type for storage keys
@@ -20,6 +21,9 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
+  timezone?: string;
+  photoURL?: string;
+  provider?: string;
   avatar?: string;
   preferences: {
     notifications: boolean;

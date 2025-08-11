@@ -1,7 +1,7 @@
 // API Configuration
 export const API_CONFIG = {
   // Base URL for the API
-  BASE_URL: 'https://api.perdiem.com', // Replace with actual API URL
+  BASE_URL: 'https://coding-challenge-pd-1a25b1a14f34.herokuapp.com', // Mock API URL
   
   // Authentication credentials
   CREDENTIALS: {
@@ -34,7 +34,7 @@ export const getApiConfig = () => {
     // Development environment
     return {
       ...API_CONFIG,
-      BASE_URL: 'https://api.perdiem.com', // or local development URL
+      BASE_URL: 'https://coding-challenge-pd-1a25b1a14f34.herokuapp.com', // Mock API URL
     };
   }
   

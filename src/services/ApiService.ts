@@ -50,6 +50,35 @@ export interface StoreOverride {
   reason?: string;
 }
 
+// Mock API Response Types
+interface MockStoreTimeResponse {
+  id: string;
+  day_of_week: number; // 1-7 (Monday-Sunday)
+  is_open: boolean;
+  start_time: string; // HH:MM format
+  end_time: string; // HH:MM format
+}
+
+interface MockStoreOverrideResponse {
+  id: string;
+  day: number;
+  month: number;
+  is_open: boolean;
+  start_time: string; // HH:MM format
+  end_time: string; // HH:MM format
+}
+
+interface MockAuthResponse {
+  token: string;
+  success?: boolean;
+  message?: string;
+  user?: {
+    id: string;
+    email: string;
+    name: string;
+  };
+}
+
 export interface StoreTimesResponse {
   success: boolean;
   data: StoreTime[];
@@ -64,11 +93,48 @@ export interface StoreOverridesResponse {
 
 // API Service Class
 class ApiService {
+  // Helper method to convert mock API day_of_week (1-7) to our format (0-6)
+  private convertDayOfWeek(mockDayOfWeek: number): number {
+    // Mock API: 1=Monday, 2=Tuesday, ..., 7=Sunday
+    // Our format: 0=Sunday, 1=Monday, ..., 6=Saturday
+    return mockDayOfWeek === 7 ? 0 : mockDayOfWeek;
+  }
+
+  // Helper method to convert mock API response to our StoreTime format
+  private mapMockStoreTime(mockTime: MockStoreTimeResponse): StoreTime {
+    return {
+      dayOfWeek: this.convertDayOfWeek(mockTime.day_of_week),
+      openTime: mockTime.start_time,
+      closeTime: mockTime.end_time,
+      isOpen: mockTime.is_open,
+    };
+  }
+
+  // Helper method to convert mock API response to our StoreOverride format
+  private mapMockStoreOverride(mockOverride: MockStoreOverrideResponse): StoreOverride {
+    const dateString = `${mockOverride.month.toString().padStart(2, '0')}/${mockOverride.day.toString().padStart(2, '0')}`;
+    
+    return {
+      date: dateString,
+      openTime: mockOverride.start_time,
+      closeTime: mockOverride.end_time,
+      isOpen: mockOverride.is_open,
+      reason: `Override for ${dateString}`,
+    };
+  }
+
   // Get store times (opening and closing hours by day of week)
   async getStoreTimes(): Promise<StoreTime[]> {
     try {
-      const response = await apiClient.get<StoreTimesResponse>(API_CONFIG.ENDPOINTS.STORE_TIMES);
-      return response.data.data;
+      const response = await apiClient.get<MockStoreTimeResponse[]>(API_CONFIG.ENDPOINTS.STORE_TIMES);
+      
+      // Map the mock API response to our format
+      const storeTimes = response.data.map(mockTime => this.mapMockStoreTime(mockTime));
+      
+      // Filter out any invalid entries and sort by day of week
+      return storeTimes
+        .filter(time => time.openTime && time.closeTime) // Only include entries with valid times
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek);
     } catch (error) {
       console.error('Error fetching store times:', error);
       // Return mock data as fallback
@@ -79,8 +145,13 @@ class ApiService {
   // Get store overrides (overrides for specific dates)
   async getStoreOverrides(): Promise<StoreOverride[]> {
     try {
-      const response = await apiClient.get<StoreOverridesResponse>(API_CONFIG.ENDPOINTS.STORE_OVERRIDES);
-      return response.data.data;
+      const response = await apiClient.get<MockStoreOverrideResponse[]>(API_CONFIG.ENDPOINTS.STORE_OVERRIDES);
+      
+      // Map the mock API response to our format
+      const storeOverrides = response.data.map(mockOverride => this.mapMockStoreOverride(mockOverride));
+      
+      // Filter out any invalid entries
+      return storeOverrides.filter(override => override.date);
     } catch (error) {
       console.error('Error fetching store overrides:', error);
       // Return mock data as fallback
@@ -88,7 +159,7 @@ class ApiService {
     }
   }
 
-  // Mock data for development/testing
+  // Mock data for development/testing (fallback)
   private getMockStoreTimes(): StoreTime[] {
     return [
       { dayOfWeek: 0, openTime: '10:00', closeTime: '18:00', isOpen: true }, // Sunday
@@ -157,6 +228,32 @@ class ApiService {
     } catch (error) {
       console.error('Error getting store hours for day:', error);
       return null;
+    }
+  }
+
+  // Authentication method using mock API
+  async authenticate(email: string, password: string): Promise<MockAuthResponse> {
+    try {
+      const response = await apiClient.post<MockAuthResponse>(API_CONFIG.ENDPOINTS.AUTH, {
+        email,
+        password,
+      });
+      
+      // Create a user profile from the email since the API only returns a token
+      const userProfile = {
+        success: true,
+        token: response.data.token,
+        user: {
+          id: `user-${Date.now()}`,
+          email: email,
+          name: email.split('@')[0],
+        },
+      };
+      
+      return userProfile;
+    } catch (error) {
+      console.error('Authentication error:', error);
+      throw error;
     }
   }
 }

@@ -67,8 +67,8 @@ const LoginScreen: React.FC<LoginScreenProps> = observer(({ onLoginSuccess }) =>
   };
 
   const handleDemoLogin = () => {
-    setEmail('demo@example.com');
-    setPassword('password123');
+    setEmail('user@tryperdiem.com');
+    setPassword('password');
     setIsSignUp(false);
   };
 

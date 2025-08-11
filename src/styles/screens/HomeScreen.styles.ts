@@ -1,6 +1,26 @@
 import { StyleSheet } from 'react-native';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../core';
 
+// Helper to map custom fontWeight string to RN-accepted values
+const getFontWeight = (weight: any) => {
+  // Acceptable values: 'normal', 'bold', 100-900 as string or number
+  // Map custom values if needed
+  switch (weight) {
+    case 'BOLD':
+      return 'bold';
+    case 'SEMIBOLD':
+      return '600';
+    case 'MEDIUM':
+      return '500';
+    case 'REGULAR':
+      return '400';
+    case 'LIGHT':
+      return '300';
+    default:
+      return weight;
+  }
+};
+
 export const homeScreenStyles = StyleSheet.create({
   container: {
     flex: 1,
@@ -15,7 +35,7 @@ export const homeScreenStyles = StyleSheet.create({
   },
   greeting: {
     fontSize: TYPOGRAPHY.FONT_SIZE.TITLE,
-    fontWeight: TYPOGRAPHY.FONT_WEIGHT.BOLD,
+    fontWeight: getFontWeight(TYPOGRAPHY.FONT_WEIGHT.BOLD),
     color: COLORS.TEXT_PRIMARY,
     marginBottom: SPACING.XS,
   },
@@ -53,7 +73,7 @@ export const homeScreenStyles = StyleSheet.create({
   logoutButtonText: {
     color: COLORS.WHITE,
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD,
+    fontWeight: getFontWeight(TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD),
   },
   storeStatus: {
     flexDirection: 'row',
@@ -85,7 +105,7 @@ export const homeScreenStyles = StyleSheet.create({
   },
   selectedTitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD,
+    fontWeight: getFontWeight(TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD),
     color: COLORS.INFO,
     marginBottom: SPACING.XS,
   },
@@ -102,7 +122,7 @@ export const homeScreenStyles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XL,
-    fontWeight: TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD,
+    fontWeight: getFontWeight(TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD),
     color: COLORS.TEXT_PRIMARY,
     marginBottom: SPACING.SM,
   },
@@ -131,7 +151,7 @@ export const homeScreenStyles = StyleSheet.create({
   },
   dateNumber: {
     fontSize: TYPOGRAPHY.FONT_SIZE.LG,
-    fontWeight: TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD,
+    fontWeight: getFontWeight(TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD),
     color: COLORS.TEXT_PRIMARY,
   },
   todayText: {
@@ -181,7 +201,7 @@ export const homeScreenStyles = StyleSheet.create({
   confirmButtonText: {
     color: COLORS.WHITE,
     fontSize: TYPOGRAPHY.FONT_SIZE.LG,
-    fontWeight: TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD,
+    fontWeight: getFontWeight(TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD),
   },
   quickBookingButton: {
     backgroundColor: COLORS.PRIMARY,
@@ -194,18 +214,20 @@ export const homeScreenStyles = StyleSheet.create({
   quickBookingButtonText: {
     color: COLORS.WHITE,
     fontSize: TYPOGRAPHY.FONT_SIZE.LG,
-    fontWeight: TYPOGRAPHY.FONT_WEIGHT.SEMIBOLD,
   },
   bottomButtonContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.WHITE,
-    paddingHorizontal: SPACING.MD,
-    paddingVertical: SPACING.MD,
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER,
-    ...SHADOWS.CARD,
+    borderTopColor: '#E0E0E0',
   },
-}); 
+  errorContainer: {
+    marginHorizontal: 20,
+    marginTop: 10,
+  },
+});
