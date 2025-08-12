@@ -228,7 +228,7 @@ src/
 ## Testing
 
 ### 🎥 Demo Video
-**[📱 Watch Complete App Demo](docs/VideoDemo.mp4)**
+**[Watch Complete App Demo](https://youtube.com/shorts/CoXWFF-Mer4)**
 
 The demo video showcases all implemented features:
 - ✅ **Google Authentication**: Complete sign-in flow
